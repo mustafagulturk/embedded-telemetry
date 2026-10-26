@@ -1,0 +1,113 @@
+# Firmware-free self test of the sensor models and of the STM32F4_I2C path.
+# Run from the repository root:
+#   renode --disable-gui --console --plain renode/tests/model_selftest.resc
+# (or: python3 renode/tests/check_models.py, which runs this and checks the output)
+
+include @renode/models/MPU6050.cs
+include @renode/models/BMP280.cs
+include @renode/models/STM32F4_ResetFlags.cs
+mach create "selftest"
+machine LoadPlatformDescription @renode/platforms/nucleo_f446re.repl
+
+echo "=== MPU6050 direct ==="
+echo "WHO_AM_I:"
+sysbus.i2c1.mpu6050 ReadRegister 0x75
+echo "PWR_MGMT_1 after reset:"
+sysbus.i2c1.mpu6050 ReadRegister 0x6B
+sysbus.i2c1.mpu6050 WriteHex "6B00"
+sysbus.i2c1.mpu6050 WriteHex "1C08"
+sysbus.i2c1.mpu6050 WriteHex "1B08"
+sysbus.i2c1.mpu6050 AccelX 0.5
+sysbus.i2c1.mpu6050 AccelY -0.25
+sysbus.i2c1.mpu6050 AccelZ 1.0
+sysbus.i2c1.mpu6050 GyroX 10
+sysbus.i2c1.mpu6050 GyroY -20
+sysbus.i2c1.mpu6050 GyroZ 100
+sysbus.i2c1.mpu6050 Temperature 36.53
+sysbus.i2c1.mpu6050 WriteHex "3B"
+echo "BURST14 (AFS=4g -> 8192 LSB/g, FS=500dps -> 65.5 LSB/dps):"
+sysbus.i2c1.mpu6050 ReadHex 14
+sysbus.i2c1.mpu6050 WriteHex "6B80"
+echo "PWR_MGMT_1 after DEVICE_RESET:"
+sysbus.i2c1.mpu6050 ReadRegister 0x6B
+echo "ACCEL_CONFIG after DEVICE_RESET:"
+sysbus.i2c1.mpu6050 ReadRegister 0x1C
+
+echo "=== BMP280 direct ==="
+echo "CHIP_ID:"
+sysbus.i2c1.bmp280 ReadRegister 0xD0
+sysbus.i2c1.bmp280 WriteHex "88"
+echo "CALIB24:"
+sysbus.i2c1.bmp280 ReadHex 24
+sysbus.i2c1.bmp280 Pressure 100000
+sysbus.i2c1.bmp280 Temperature 25
+sysbus.i2c1.bmp280 WriteHex "F4B7"
+sysbus.i2c1.bmp280 WriteHex "F7"
+echo "RAW6_A (P=100000 Pa, T=25.00 C):"
+sysbus.i2c1.bmp280 ReadHex 6
+sysbus.i2c1.bmp280 Pressure 98765.43
+sysbus.i2c1.bmp280 Temperature -12.34
+sysbus.i2c1.bmp280 WriteHex "F7"
+echo "RAW6_B (P=98765.43 Pa, T=-12.34 C):"
+sysbus.i2c1.bmp280 ReadHex 6
+sysbus.i2c1.bmp280 WriteHex "F425"
+sysbus.i2c1.bmp280 Pressure 101325
+sysbus.i2c1.bmp280 Temperature 21.5
+sysbus.i2c1.bmp280 WriteHex "F425"
+sysbus.i2c1.bmp280 WriteHex "F7"
+echo "RAW6_C (forced, P=101325 Pa, T=21.50 C):"
+sysbus.i2c1.bmp280 ReadHex 6
+echo "CTRL_MEAS after forced (mode bits must be 00):"
+sysbus.i2c1.bmp280 ReadRegister 0xF4
+
+echo "=== STM32F4_I2C register path (i2c1 @ 0x40005400) ==="
+sysbus WriteDoubleWord 0x40005400 0x00000001
+sysbus WriteDoubleWord 0x40005400 0x00000501
+echo "SR1 after START (expect SB=0x1):"
+sysbus ReadDoubleWord 0x40005414
+sysbus WriteDoubleWord 0x40005410 0xD0
+echo "SR1 after addr+W (expect ADDR|TXE = 0x82):"
+sysbus ReadDoubleWord 0x40005414
+echo "SR2 (clears ADDR; expect MSL|TRA = 0x5):"
+sysbus ReadDoubleWord 0x40005418
+sysbus WriteDoubleWord 0x40005410 0x75
+echo "SR1 after data byte (expect TXE|BTF = 0x84):"
+sysbus ReadDoubleWord 0x40005414
+sysbus WriteDoubleWord 0x40005400 0x00000501
+echo "SR1 after repeated START (expect SB):"
+sysbus ReadDoubleWord 0x40005414
+sysbus WriteDoubleWord 0x40005410 0xD1
+echo "SR1 after addr+R (expect ADDR|BTF|RXNE = 0x46):"
+sysbus ReadDoubleWord 0x40005414
+sysbus ReadDoubleWord 0x40005418
+echo "DR (expect WHO_AM_I 0x68):"
+sysbus ReadDoubleWord 0x40005410
+sysbus WriteDoubleWord 0x40005400 0x00000201
+
+echo "=== Fault injection: MPU6050 Disconnected ==="
+sysbus.i2c1.mpu6050 Disconnected true
+sysbus WriteDoubleWord 0x40005400 0x00000501
+sysbus ReadDoubleWord 0x40005414
+sysbus WriteDoubleWord 0x40005410 0xD0
+echo "SR1 after addr+W to disconnected device (expect AF = 0x400, no ADDR):"
+sysbus ReadDoubleWord 0x40005414
+echo "SR1 read again (AF is read-to-clear in Renode -> 0x0):"
+sysbus ReadDoubleWord 0x40005414
+sysbus WriteDoubleWord 0x40005400 0x00000201
+echo "Still visible in monitor while disconnected, WHO_AM_I:"
+sysbus.i2c1.mpu6050 ReadRegister 0x75
+sysbus.i2c1.mpu6050 Disconnected false
+sysbus WriteDoubleWord 0x40005400 0x00000501
+sysbus ReadDoubleWord 0x40005414
+sysbus WriteDoubleWord 0x40005410 0xD0
+echo "SR1 after reconnect (expect ADDR|TXE = 0x82):"
+sysbus ReadDoubleWord 0x40005414
+sysbus ReadDoubleWord 0x40005418
+sysbus WriteDoubleWord 0x40005400 0x00000201
+
+echo "=== RCC_CSR reset flags (expect 0x0E000000 at power-on) ==="
+sysbus ReadDoubleWord 0x40023874
+sysbus WriteDoubleWord 0x40023874 0x01000000
+echo "after RMVF (expect 0x0):"
+sysbus ReadDoubleWord 0x40023874
+echo "=== END ==="

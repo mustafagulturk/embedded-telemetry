@@ -67,7 +67,13 @@ static void sample_imu(telemetry_sample_t *s)
             /* transient error: keep trying next cycle */
         }
     } else if (health_should_retry(&s_health, HEALTH_SENSOR_IMU)) {
-        (void)imu_init();
+        /* Configure without the 100 ms device reset so recovery attempts do
+         * not stall sampling; fall back to a full init if it never came up. */
+        if (s_imu.bus != NULL) {
+            (void)mpu6050_configure(&s_imu);
+        } else {
+            (void)imu_init();
+        }
     } else {
         /* faulted, waiting for the next retry slot */
     }
@@ -134,8 +140,14 @@ void sensor_task(void *arg)
         health_mark_faulted(&s_health, HEALTH_SENSOR_BARO);
     }
 
+    wake = xTaskGetTickCount();  /* sensor init above may have blocked >100 ms */
     for (;;) {
-        vTaskDelayUntil(&wake, pdMS_TO_TICKS(SENSOR_PERIOD_MS));
+        if (xTaskDelayUntil(&wake, pdMS_TO_TICKS(SENSOR_PERIOD_MS)) == pdFALSE) {
+            /* Deadline already missed (e.g. a sensor re-init blocked this task):
+             * re-anchor instead of firing a burst of catch-up samples that would
+             * overflow the sample queue. */
+            wake = xTaskGetTickCount();
+        }
         uint32_t t0 = bsp_time_us();
         float dt_s = (float)(t0 - last_us) * 1.0e-6f;
         last_us = t0;

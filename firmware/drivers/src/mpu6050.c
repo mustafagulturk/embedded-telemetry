@@ -35,7 +35,6 @@ i2c_status_t mpu6050_init(mpu6050_t *dev, const i2c_bus_t *bus, uint8_t addr,
                           const mpu6050_cfg_t *cfg)
 {
     i2c_status_t st;
-    uint8_t who = 0U;
 
     if ((dev == NULL) || (bus == NULL) || (cfg == NULL) || (bus->write == NULL) ||
         (bus->read_regs == NULL) || ((uint32_t)cfg->accel_fs > 3U) ||
@@ -54,8 +53,19 @@ i2c_status_t mpu6050_init(mpu6050_t *dev, const i2c_bus_t *bus, uint8_t addr,
     if (bus->delay_ms != NULL) {
         bus->delay_ms(bus->ctx, RESET_DELAY_MS);
     }
+    return mpu6050_configure(dev);
+}
 
-    st = bus->read_regs(bus->ctx, addr, MPU6050_REG_WHO_AM_I, &who, 1U);
+i2c_status_t mpu6050_configure(mpu6050_t *dev)
+{
+    i2c_status_t st;
+    uint8_t who = 0U;
+
+    if ((dev == NULL) || (dev->bus == NULL)) {
+        return I2C_ERR_PARAM;
+    }
+    dev->ready = false;
+    st = dev->bus->read_regs(dev->bus->ctx, dev->addr, MPU6050_REG_WHO_AM_I, &who, 1U);
     if (st != I2C_OK) {
         return st;
     }
@@ -65,19 +75,19 @@ i2c_status_t mpu6050_init(mpu6050_t *dev, const i2c_bus_t *bus, uint8_t addr,
 
     st = write_reg(dev, MPU6050_REG_PWR_MGMT_1, PWR_MGMT_1_CLK_PLL_GX);
     if (st == I2C_OK) {
-        if (bus->delay_ms != NULL) {
-            bus->delay_ms(bus->ctx, WAKE_DELAY_MS);
+        if (dev->bus->delay_ms != NULL) {
+            dev->bus->delay_ms(dev->bus->ctx, WAKE_DELAY_MS);
         }
-        st = write_reg(dev, MPU6050_REG_SMPLRT_DIV, cfg->smplrt_div);
+        st = write_reg(dev, MPU6050_REG_SMPLRT_DIV, dev->cfg.smplrt_div);
     }
     if (st == I2C_OK) {
-        st = write_reg(dev, MPU6050_REG_CONFIG, cfg->dlpf_cfg);
+        st = write_reg(dev, MPU6050_REG_CONFIG, dev->cfg.dlpf_cfg);
     }
     if (st == I2C_OK) {
-        st = write_reg(dev, MPU6050_REG_GYRO_CONFIG, (uint8_t)((uint8_t)cfg->gyro_fs << 3U));
+        st = write_reg(dev, MPU6050_REG_GYRO_CONFIG, (uint8_t)((uint8_t)dev->cfg.gyro_fs << 3U));
     }
     if (st == I2C_OK) {
-        st = write_reg(dev, MPU6050_REG_ACCEL_CONFIG, (uint8_t)((uint8_t)cfg->accel_fs << 3U));
+        st = write_reg(dev, MPU6050_REG_ACCEL_CONFIG, (uint8_t)((uint8_t)dev->cfg.accel_fs << 3U));
     }
     dev->ready = (st == I2C_OK);
     return st;

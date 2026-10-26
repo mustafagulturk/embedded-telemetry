@@ -8,7 +8,7 @@ CRC hatası) raporlayan Python yer istasyonu.
 (senkron `0xA5 0x5A`, CRC-16/CCITT-FALSE, little-endian; tip `0x01` telemetri
 100 Hz, tip `0x02` istatistik 1 Hz).
 
-![Simülatör gösterimi](docs/demo_sim.gif)
+![Renode gösterimi](../docs/img/demo_renode.gif)
 
 ## Kurulum
 

@@ -1,0 +1,50 @@
+:name: NUCLEO-F446RE telemetry
+:description: STM32F446RE + MPU6050 + BMP280 (I2C1), binary telemetry on USART2 -> TCP 3456
+
+# Usage (from anywhere; paths are resolved relative to this file via $ORIGIN):
+#   renode --disable-gui --console renode/telemetry.resc
+#   renode --disable-gui --console -e '$elf=@/abs/path/firmware.elf; include @renode/telemetry.resc'
+# Then in the monitor: `start` (or pass -e start after the script).
+
+# Firmware image (override BEFORE including this script by setting $elf)
+$elf ?= $ORIGIN/../build/fw/firmware/firmware.elf
+# TCP port for USART2 (ground station: python -m telemetry_gs --tcp localhost:3456)
+$uart_port ?= 3456
+
+# 1) Custom C# models. They MUST be compiled before the platform is loaded.
+#    Each `include`d .cs file becomes its own assembly; they cannot reference each other.
+include $ORIGIN/models/MPU6050.cs
+include $ORIGIN/models/BMP280.cs
+include $ORIGIN/models/STM32F4_ResetFlags.cs
+
+# 2) Machine + platform
+mach create "nucleo"
+machine LoadPlatformDescription $ORIGIN/platforms/nucleo_f446re.repl
+
+# 16 MHz HSI core: ~16 M instructions per virtual second, so busy loops / CPU load look like on the board
+sysbus.cpu PerformanceInMips 16
+
+# 3) USART2 -> TCP server socket (binary-safe, no telnet negotiation)
+emulation CreateServerSocketTerminal $uart_port "term" false
+connector Connect sysbus.usart2 term
+
+# 4) Sensor scenario
+sysbus.i2c1.mpu6050 AccelZ 1.0
+sysbus.i2c1.mpu6050 AccelNoiseStdDev 0.002
+sysbus.i2c1.mpu6050 GyroNoiseStdDev 0.05
+sysbus.i2c1.mpu6050 Temperature 24.0
+sysbus.i2c1.bmp280 Temperature 22.5
+sysbus.i2c1.bmp280 PressureNoiseStdDev 1.0
+# virtual-time flight: 2 s on the ground, 10 s climb to 120 m, 10 s hover, 20 s descent
+sysbus.i2c1.bmp280 FlightProfileDelay 2.0
+sysbus.i2c1.bmp280 FlightProfileApogee 120.0
+sysbus.i2c1.bmp280 FlightProfile true
+
+# 5) Firmware
+macro reset
+"""
+    sysbus LoadELF $elf
+"""
+runMacro $reset
+
+echo "Hazir. Calistirmak icin 'start'. USART2 -> TCP sunucu soketi (varsayilan 3456)."
