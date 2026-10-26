@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  host-tests:
+    name: Birim testleri (host, Unity + ASan/UBSan)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build/host -DCMAKE_BUILD_TYPE=Debug -DTELEMETRY_COVERAGE=ON
+      - name: Build
+        run: cmake --build build/host -j
+      - name: Test
+        run: ctest --test-dir build/host --output-on-failure
+      - name: Coverage summary
+        run: |
+          pip install --quiet gcovr
+          gcovr -r . --filter firmware/ build/host --print-summary --txt build/host/coverage.txt
+          cat build/host/coverage.txt
+
+  firmware:
+    name: Firmware (arm-none-eabi-gcc, -Werror)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi libnewlib-arm-none-eabi
+      - name: Configure
+        run: cmake -S . -B build/fw -DCMAKE_TOOLCHAIN_FILE=cmake/arm-none-eabi.cmake -DCMAKE_BUILD_TYPE=MinSizeRel
+      - name: Build
+        run: cmake --build build/fw -j
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: |
+            build/fw/firmware/firmware.elf
+            build/fw/firmware/firmware.bin
+            build/fw/firmware/firmware.map
