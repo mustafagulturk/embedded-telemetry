@@ -44,3 +44,34 @@ jobs:
             build/fw/firmware/firmware.elf
             build/fw/firmware/firmware.bin
             build/fw/firmware/firmware.map
+
+  renode:
+    name: Renode uçtan uca test (emüle MPU6050 + BMP280)
+    needs: firmware
+    runs-on: ubuntu-24.04
+    env:
+      RENODE_VERSION: 1.15.3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: firmware
+          path: build/fw/firmware
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Renode
+        run: |
+          curl -fsSL -o renode.tgz "https://github.com/renode/renode/releases/download/v${RENODE_VERSION}/renode-${RENODE_VERSION}.linux-portable-dotnet.tar.gz"
+          mkdir -p "$HOME/renode" && tar xzf renode.tgz -C "$HOME/renode" --strip-components=1
+          pip install -r "$HOME/renode/tests/requirements.txt"
+      - name: Robot tests
+        run: |
+          "$HOME/renode/renode-test" -r renode/tests/results \
+            --variable ELF:"$GITHUB_WORKSPACE/build/fw/firmware/firmware.elf" \
+            renode/tests/telemetry.robot
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: renode-results
+          path: renode/tests/results

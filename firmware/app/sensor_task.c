@@ -134,8 +134,14 @@ void sensor_task(void *arg)
         health_mark_faulted(&s_health, HEALTH_SENSOR_BARO);
     }
 
+    wake = xTaskGetTickCount();  /* sensor init above may have blocked >100 ms */
     for (;;) {
-        vTaskDelayUntil(&wake, pdMS_TO_TICKS(SENSOR_PERIOD_MS));
+        if (xTaskDelayUntil(&wake, pdMS_TO_TICKS(SENSOR_PERIOD_MS)) == pdFALSE) {
+            /* Deadline already missed (e.g. a sensor re-init blocked this task):
+             * re-anchor instead of firing a burst of catch-up samples that would
+             * overflow the sample queue. */
+            wake = xTaskGetTickCount();
+        }
         uint32_t t0 = bsp_time_us();
         float dt_s = (float)(t0 - last_us) * 1.0e-6f;
         last_us = t0;
