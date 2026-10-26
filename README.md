@@ -1,5 +1,12 @@
 # embedded-telemetry
 
+> **English summary:** C11 firmware for an embedded telemetry board on an STM32F446RE
+> (Nucleo-F446RE) running FreeRTOS, plus a Python ground station. It samples an MPU6050 IMU and a
+> BMP280 barometer at 100 Hz through its own register-level I2C drivers, filters the altitude and
+> streams CRC-16 framed binary packets over UART, with a watchdog, sensor-loss detection and a
+> fail-safe mode. It is tested with Unity unit tests on the host (ASan/UBSan, drivers against a fake
+> I2C bus) and end-to-end Robot tests in the Renode emulator, all run in GitHub Actions.
+
 STM32F446RE + FreeRTOS üzerinde çalışan gömülü telemetri kartı firmware'i ve Python yer istasyonu.
 IMU (MPU6050) ve basınç sensörü (BMP280) kendi yazdığım I2C sürücüleriyle 100 Hz okunur, basınçtan
 irtifa hesaplanıp filtrelenir, veriler CRC-16'lı ikili paketlerle UART üzerinden yer istasyonuna gider.
@@ -231,6 +238,9 @@ firmware ELF'inin Renode'da otomatik test edilmesi, yer istasyonu için pytest +
   örneklemeyi durdurması. İkisi de düzeltildi ve testle korunuyor.
 
 ## Gerçek karta geçiş
+
+> **Not:** Firmware şimdilik yalnızca Renode emülatöründe çalıştırılıp test edildi; gerçek bir
+> Nucleo-F446RE kartında henüz denenmedi.
 
 Aynı `firmware.elf` Nucleo-F446RE'ye yüklenebilir (`st-flash write build/fw/firmware/firmware.bin 0x08000000`
 veya STM32CubeProgrammer). Bağlantılar:
