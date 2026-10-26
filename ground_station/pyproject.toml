@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "telemetry-gs"
+version = "0.1.0"
+description = "Ground station for the embedded telemetry board (binary frame decoder, CSV logger, live plot)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pyserial>=3.5",
+    "matplotlib>=3.7",
+    "pillow>=9.1",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[project.scripts]
+telemetry-gs = "telemetry_gs.__main__:main"
+telemetry-gs-sim = "telemetry_gs.simulate:main"
+telemetry-gs-gif = "telemetry_gs.make_gif:main"
+
+[tool.setuptools]
+packages = ["telemetry_gs"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

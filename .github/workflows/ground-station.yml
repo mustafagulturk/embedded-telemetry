@@ -1,0 +1,27 @@
+name: Ground station
+
+on:
+  push:
+    branches: [main]
+    paths: ["ground_station/**", ".github/workflows/ground-station.yml"]
+  pull_request:
+    paths: ["ground_station/**", ".github/workflows/ground-station.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    name: Yer istasyonu (pytest + mypy)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: ground_station
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt mypy types-pyserial
+      - run: python -m pytest -q
+      - run: python -m mypy --strict telemetry_gs tests

@@ -1,0 +1,4 @@
+pyserial>=3.5
+matplotlib>=3.7
+pillow>=9.1
+pytest>=7.0
