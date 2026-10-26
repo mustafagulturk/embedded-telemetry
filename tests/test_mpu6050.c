@@ -97,6 +97,30 @@ static void test_scaling_other_ranges(void)
     TEST_ASSERT_EQUAL_INT16(2000, mpu6050_accel_to_mg(&d, 32767));
 }
 
+static void test_configure_recovers_without_reset(void)
+{
+    mpu6050_cfg_t cfg = mpu6050_default_cfg();
+    TEST_ASSERT_EQUAL(I2C_OK, mpu6050_init(&dev, &bus.bus, 0x68, &cfg));
+    /* Device drops off and comes back power-cycled (sleep, default config). */
+    imu->nack = true;
+    TEST_ASSERT_EQUAL(I2C_ERR_NACK, mpu6050_configure(&dev));
+    TEST_ASSERT_FALSE(dev.ready);
+    imu->nack = false;
+    imu->regs[MPU6050_REG_PWR_MGMT_1] = 0x40;
+    imu->regs[MPU6050_REG_ACCEL_CONFIG] = 0;
+    bus.nlog = 0;
+    bus.delay_total_ms = 0;
+    TEST_ASSERT_EQUAL(I2C_OK, mpu6050_configure(&dev));
+    TEST_ASSERT_TRUE(dev.ready);
+    TEST_ASSERT_EQUAL_HEX8(0x01, imu->regs[MPU6050_REG_PWR_MGMT_1]);
+    TEST_ASSERT_EQUAL_HEX8(0x08, imu->regs[MPU6050_REG_ACCEL_CONFIG]);
+    for (int i = 0; i < bus.nlog; i++) {
+        TEST_ASSERT_NOT_EQUAL(0x80, bus.log[i].val); /* no DEVICE_RESET written */
+    }
+    TEST_ASSERT_TRUE(bus.delay_total_ms < 100);
+    TEST_ASSERT_EQUAL(I2C_ERR_PARAM, mpu6050_configure(NULL));
+}
+
 static void test_read_error_propagates(void)
 {
     mpu6050_cfg_t cfg = mpu6050_default_cfg();
@@ -115,6 +139,7 @@ int main(void)
     RUN_TEST(test_init_bad_params);
     RUN_TEST(test_burst_read_and_scaling);
     RUN_TEST(test_scaling_other_ranges);
+    RUN_TEST(test_configure_recovers_without_reset);
     RUN_TEST(test_read_error_propagates);
     return UNITY_END();
 }

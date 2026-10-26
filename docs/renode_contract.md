@@ -1,7 +1,7 @@
 # Firmware <-> Renode sözleşmesi
 
 - MCU: STM32F446RE (Renode `platforms/cpus/stm32f4.repl` temelli), sistem saati 16 MHz HSI (PLL yok, Renode ve gerçek kartta aynı).
-- I2C1: PB8 = SCL, PB9 = SDA (Nucleo Arduino D15/D14), 100 kHz.
+- I2C1: PB8 = SCL, PB9 = SDA (Nucleo Arduino D15/D14), ~400 kHz (fast mode).
   - MPU6050 @ 0x68 (WHO_AM_I 0x75 = 0x68)
   - BMP280  @ 0x76 (chip id 0xD0 = 0x58)
 - USART2: PA2 TX / PA3 RX, 115200 8N1 (Nucleo ST-LINK sanal COM portu). İkili telemetri burada.

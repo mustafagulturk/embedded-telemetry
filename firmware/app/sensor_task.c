@@ -67,7 +67,13 @@ static void sample_imu(telemetry_sample_t *s)
             /* transient error: keep trying next cycle */
         }
     } else if (health_should_retry(&s_health, HEALTH_SENSOR_IMU)) {
-        (void)imu_init();
+        /* Configure without the 100 ms device reset so recovery attempts do
+         * not stall sampling; fall back to a full init if it never came up. */
+        if (s_imu.bus != NULL) {
+            (void)mpu6050_configure(&s_imu);
+        } else {
+            (void)imu_init();
+        }
     } else {
         /* faulted, waiting for the next retry slot */
     }

@@ -52,6 +52,14 @@ mpu6050_cfg_t mpu6050_default_cfg(void);
 i2c_status_t mpu6050_init(mpu6050_t *dev, const i2c_bus_t *bus, uint8_t addr,
                           const mpu6050_cfg_t *cfg);
 
+/**
+ * Verify WHO_AM_I, wake and write the configuration without a device reset.
+ * Used to recover a device that dropped off the bus: a power-cycled MPU-6050
+ * is already in its reset state, so the 100 ms reset wait is not needed and
+ * the 100 Hz sampling loop is not stalled. Requires a prior mpu6050_init().
+ */
+i2c_status_t mpu6050_configure(mpu6050_t *dev);
+
 /** One 14-byte burst read of accel, temperature and gyro. */
 i2c_status_t mpu6050_read_raw(mpu6050_t *dev, mpu6050_raw_t *out);
 
