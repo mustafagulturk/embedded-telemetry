@@ -1,0 +1,10 @@
+build*/
+__pycache__/
+*.pyc
+.venv/
+*.csv
+!ground_station/samples/*.csv
+renode/results/
+*.elf
+*.bin
+*.map
